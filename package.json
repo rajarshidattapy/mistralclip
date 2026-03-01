@@ -10,7 +10,8 @@
     "dev:frontend": "vite --config frontend/vite.config.ts",
     "lint": "tsc --noEmit",
     "test": "tsx --test backend/**/*.test.ts",
-    "start": "tsx backend/api.ts"
+    "start": "tsx backend/api.ts",
+    "cli": "tsx backend/cli.ts"
   },
   "dependencies": {
     "cors": "^2.8.5",
@@ -31,4 +32,3 @@
     "vite": "^5.4.14"
   }
 }
-

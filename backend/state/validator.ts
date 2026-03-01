@@ -52,8 +52,8 @@ export function validateProject(project: ProjectState): ValidationError[] {
     trackIds.add(track.id);
 
     const sorted = [...track.clips].sort((a, b) => a.startMs - b.startMs);
-    for (let index = 0; index < sorted.length; index += 1) {
-      const clip = sorted[index];
+    let previousClip: Clip | null = null;
+    for (const clip of sorted) {
       if (clip.trackId !== track.id) {
         errors.push({
           path: `tracks.${track.id}.clips.${clip.id}.trackId`,
@@ -104,7 +104,7 @@ export function validateProject(project: ProjectState): ValidationError[] {
         }
       }
 
-      if (index > 0 && overlaps(sorted[index - 1], clip)) {
+      if (previousClip && overlaps(previousClip, clip)) {
         errors.push({
           path: `tracks.${track.id}.clips`,
           message: `Clips overlap on track ${track.id}`
@@ -112,6 +112,7 @@ export function validateProject(project: ProjectState): ValidationError[] {
       }
 
       computedDuration = Math.max(computedDuration, clipEndMs(clip));
+      previousClip = clip;
     }
   }
 
@@ -148,4 +149,3 @@ export function assertClipWithinBounds(clip: Clip): void {
     throw new Error("Clip start and in values must be >= 0");
   }
 }
-

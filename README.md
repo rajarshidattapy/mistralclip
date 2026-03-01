@@ -1,4 +1,4 @@
-# Agentic Video Editing Tool
+# MistralClip
 
 AI-powered agentic video editing tool to automatically create edited videos with transitions, effects, text overlays, and audio mixing. The tool is end-to-end autonomous till the final edit generation. Just feed in your edit requirements as a csv.
 
@@ -39,13 +39,7 @@ Check the available config csv files for reference.
 ## Configuration
 
 Environment variables (optional, can also use CLI args. Preferred create a .env file):
-- `OPENAI_API_KEY` - Your openai API key
-- `LLM_PROVIDER` - openai
-- `LLM_MODEL` - Model name (default: gpt-4o-mini)
-- `PLANNING_MODEL` - Model for planning tasks (default: gpt-5)
-- `CODING_MODEL` - Model for code generation (default: gpt-5)
-
-Suggest using gpt-4.1 for a better balance of cost, time and accuracy.
+- MISTRAL_API_KEY'
 
 CLI options:
 - `--llm-provider` - LLM provider

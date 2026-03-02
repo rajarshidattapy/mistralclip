@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MistralClipTimeline",
+  "type": "object",
+  "required": ["project_id", "duration", "tracks", "transitions"],
+  "properties": {
+    "project_id": {
+      "type": "string"
+    },
+    "duration": {
+      "type": "number",
+      "minimum": 0
+    },
+    "tracks": {
+      "type": "object",
+      "required": ["video", "audio", "overlay"],
+      "properties": {
+        "video": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/clip"
+          }
+        },
+        "audio": {
+          "type": "array",
+          "items": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/clip"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "level": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 2
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "overlay": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/overlay"
+          }
+        }
+      }
+    },
+    "transitions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/transition"
+      }
+    }
+  },
+  "$defs": {
+    "clip": {
+      "type": "object",
+      "required": ["id", "asset_id", "start", "end", "timeline_start"],
+      "properties": {
+        "id": { "type": "string" },
+        "asset_id": { "type": "string" },
+        "start": { "type": "number", "minimum": 0 },
+        "end": { "type": "number", "exclusiveMinimum": 0 },
+        "timeline_start": { "type": "number", "minimum": 0 }
+      }
+    },
+    "overlay": {
+      "type": "object",
+      "required": ["id", "start", "end", "timeline_start"],
+      "properties": {
+        "id": { "type": "string" },
+        "asset_id": { "type": ["string", "null"] },
+        "text": { "type": ["string", "null"] },
+        "start": { "type": "number", "minimum": 0 },
+        "end": { "type": "number", "exclusiveMinimum": 0 },
+        "timeline_start": { "type": "number", "minimum": 0 },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "font_size": { "type": "integer" },
+        "color": { "type": "string" }
+      }
+    },
+    "transition": {
+      "type": "object",
+      "required": ["id", "type", "from_clip_id", "to_clip_id", "duration"],
+      "properties": {
+        "id": { "type": "string" },
+        "type": {
+          "type": "string",
+          "enum": ["fade", "crossfade"]
+        },
+        "from_clip_id": { "type": "string" },
+        "to_clip_id": { "type": "string" },
+        "duration": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    }
+  }
+}

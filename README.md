@@ -1,64 +1,60 @@
-# MistralClip
+# MistralClip MVP - codex resume 019cac0c-0b22-7102-ac49-a98a0202a479
 
-AI-powered agentic video editing tool to automatically create edited videos with transitions, effects, text overlays, and audio mixing. The tool is end-to-end autonomous till the final edit generation. Just feed in your edit requirements as a csv.
+Implementation of the PRD in `PRD.md`:
+- FastAPI backend with timeline JSON as source of truth.
+- Tool-driven mutations for manual and AI edits.
+- Next.js frontend with assets pane, preview, chat, and timeline.
+- Export path triggered only by `/export` or `export_project`.
 
-Find a edit produced using this tool here - `artifacts/output_video.mp4` and all the generated/reviewed plans and codes here - `artifacts/`. These artifacts are based on `video_editing_config_01.csv`.
+## Repo Layout
 
-## Installation
-
-```bash
-pip install -r requirements.txt
+```
+apps/
+backend/
+frontend/
+shared/
+scripts/
+README.md
+docker-compose.yml
 ```
 
-**Note:** Requires `exiftool` for video orientation detection, if videos are imported through an iPhone:
-- macOS: `brew install exiftool`
-- Linux: `apt-get install libimage-exiftool-perl` or `yum install perl-Image-ExifTool`
+## Backend
 
-## Quick Start
+1. Create/activate a Python environment.
+2. Install deps:
+   - `pip install -r backend/requirements.txt`
+3. Run API:
+   - `uvicorn backend.main:app --reload --port 8000`
 
-```bash
-python main.py video_editing_config.csv --artifacts-dir artifacts
-```
+Core endpoints:
+- `GET /health`
+- `GET /timeline/{project_id}`
+- `POST /timeline/mutate`
+- `POST /chat`
+- `POST /assets/upload`
+- `POST /export`
 
-## CSV Format
+## Frontend
 
-Required columns:
-- `order` - Clip sequence number
-- `video_path` - Path to video/image file
-- `start_time` - Start time in seconds
-- `end_time` - End time in seconds (use `-1` for "till end of clip", optional for images)
-- `transition` - Transition type (fade in/out, etc.) with any specifications
-- `effects` - Video effects (speed, brightness, blur, etc.) with any specifications
-- `overlay_text` - Text to overlay
-- `overlay_description` - Text position, timing, styling, duration, etc
-- `audio_description` - Audio mode (keep/replace/mix), volume, external audio path, transitions, etc
-- `additional_operations` - Additional ops (rotate, scale, crop), image duration (e.g., "display for 0.5s"), or any other operations/tasks
+1. `cd frontend`
+2. Install packages:
+   - `npm install`
+3. Run:
+   - `npm run dev`
 
-Check the available config csv files for reference.
+Set backend URL if needed:
+- `NEXT_PUBLIC_API_URL=http://localhost:8000`
 
-## Configuration
+## Agent Behavior
 
-Environment variables (optional, can also use CLI args. Preferred create a .env file):
-- MISTRAL_API_KEY'
+- AI does not edit files.
+- AI emits tool calls only.
+- Tool calls mutate timeline JSON.
+- Manual UI edits call the same backend mutate pathway.
+- Export rendering is isolated to export execution.
 
-CLI options:
-- `--llm-provider` - LLM provider
-- `--llm-model` - LLM model
-- `--planning-model` - Planning model
-- `--coding-model` - Coding model
-- `--artifacts-dir` - Directory for artifacts (default: artifacts)
-- `--output` - Output video path
+## Notes
 
-## Output
+- If `ffmpeg` is not installed, export writes a fallback `.export.txt` file with the render command/error.
+- Mistral model usage is optional. If `MISTRAL_API_KEY` is set and `langchain-mistralai` is installed, chat can try model planning; otherwise deterministic rule parsing is used.
 
-- Final video: `--output` path (default: `artifacts/output_video.mp4`)
-- Artifacts: Plans, reviewed plans, generated code, reviewed code and progress saved in `--artifacts-dir`.
-
-## Workflow
-
-1. **CSV Validation** - Validates CSV structure and file paths
-2. **Planning** - LLM generates editing plan from CSV
-3. **Plan Review** - LLM reviews and refines the plan
-4. **Code Generation** - LLM generates Python code to execute the plan
-5. **Code Review** - LLM reviews and fixes code
-6. **Execution** - Code runs and feedback loop to Code Review for debugging (up to 15 retries)

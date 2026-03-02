@@ -1,301 +1,399 @@
-Below is a **proper PRD** for that transition.
+# PRD — MistralClip (Ultra-Lean but Powerful MVP)
+
+## 0. Design Philosophy (Non-Negotiable)
+
+1. **AI never edits files directly**
+2. **AI only calls tools**
+3. **Tools mutate timeline JSON**
+4. **Timeline JSON is source of truth**
+5. **Manual UI actions = same tools**
+6. **FFmpeg runs only at export**
+
+If any part violates this → architecture is wrong.
 
 ---
 
-# PRD: Mistral Vibe–Powered Agentic Video Editing Engine
+## 1. Product Definition
 
-## 1. Problem Statement
+### Product Name
 
-The current agentic video editor relies on:
+**MistralClip** (working)
 
-* Direct LLM calls (OpenAI / Anthropic / Ollama)
-* In-process planning, code generation, and review loops
-* Python-based orchestration with retry-heavy execution
+### Product Type
 
-This leads to:
+AI-orchestrated non-linear video editor (NLE)
 
-* Fragile LLM interactions
-* High retry costs
-* Poor agent observability
-* Tight coupling between orchestration logic and model providers
+### Core Value
 
-**Goal:**
-Re-architect the agentic video editor to run on **Mistral Vibe CLI as the agent runtime**, using **Mistral APIs for inference**, while preserving:
-
-* Autonomous end-to-end video editing
-* Artifact generation
-* Multi-agent reasoning (planner, reviewer, coder)
+Edit real videos faster by letting an AI **operate the editor**, not invent content.
 
 ---
 
-## 2. Goals & Non-Goals
+## 2. MVP Feature Scope (Hard-Limited)
 
-### Goals
+### INCLUDED
 
-* Use **Mistral Vibe CLI** as the primary agent execution environment
-* Use **Mistral API key** for all LLM inference
-* Decouple orchestration logic from Python LLM wrappers
-* Preserve existing CSV → plan → execution workflow
-* Maintain artifact logging and replayability
+* Upload video/audio/image
+* Single video track
+* Single audio track
+* Single overlay track
+* Trim / split / move
+* Fade & crossfade transitions
+* Text + image overlays
+* AI chat → tool calls
+* Export MP4
 
-### Non-Goals
+### EXCLUDED (Explicit)
 
-* No UI redesign
-* No live video editing
-* No real-time streaming support (future)
-* No replacement of FFmpeg/MoviePy execution engine (yet)
+* Video generation
+* Audio generation
+* Subtitles
+* Animations
+* Keyframes
+* Multiple tracks
+* Collaboration
 
 ---
 
-## 3. High-Level Architecture
-
-### Before
+## 3. UI Layout (Locked)
 
 ```
-CSV
- ↓
-Python Orchestrator
- ↓
-LLM Calls (OpenAI/Anthropic/Ollama)
- ↓
-Generated Python Code
- ↓
-Video Execution
-```
-
-### After
-
-```
-CSV
- ↓
-Mistral Vibe Agent Runtime (CLI)
- ↓
-Subagents (Planner / Reviewer / Coder)
- ↓
-Python Video Execution Engine
- ↓
-Artifacts + Final Video
+┌──────────────┬────────────────────────────┬──────────────┐
+│ Assets Pane  │        Preview Canvas       │   AI Chat    │
+│              │                              │   (Mistral)  │
+├──────────────┴────────────────────────────┴──────────────┤
+│                         Timeline                             │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 4. Core Design Principles
+## 4. Core Data Model (Authoritative)
 
-1. **Agent Runtime Externalization**
-
-   * Vibe manages context, memory, tools, and subagents
-   * Python becomes a tool, not the brain
-
-2. **Single LLM Provider**
-
-   * All inference via Mistral API
-   * Configurable models per agent role
-
-3. **Deterministic Tooling**
-
-   * Agents plan and validate
-   * Execution remains deterministic Python
-
-4. **Auditability First**
-
-   * Every Vibe interaction stored as an artifact
-   * Full reproducibility
-
----
-
-## 5. Agent Roles (Vibe Subagents)
-
-### 5.1 Planner Agent
-
-**Responsibility**
-
-* Parse validated CSV
-* Produce a structured video edit plan
-
-**Input**
-
-* CSV content
-* Media metadata (duration, orientation, fps)
-
-**Output**
-
-* `plan.json`
+### Timeline Schema (MVP)
 
 ```json
 {
-  "clips": [...],
-  "transitions": [...],
-  "effects": [...],
-  "audio": [...]
+  "project_id": "string",
+  "duration": 0,
+  "tracks": {
+    "video": [
+      {
+        "id": "clip_id",
+        "asset_id": "asset_id",
+        "start": 0,
+        "end": 5,
+        "timeline_start": 0
+      }
+    ],
+    "audio": [],
+    "overlay": []
+  },
+  "transitions": []
 }
 ```
 
----
+**Rules**
 
-### 5.2 Plan Reviewer Agent
-
-**Responsibility**
-
-* Validate feasibility
-* Resolve ambiguities
-* Normalize effects/transitions to supported ops
-
-**Output**
-
-* `plan_reviewed.json`
-* Review comments (artifact)
+* All timestamps in seconds
+* No overlaps on video track
+* Adjacent clips only for transitions
 
 ---
 
-### 5.3 Code Planner Agent (NEW)
+## 5. AI System (LangChain + Mistral)
 
-**Responsibility**
+### Agent Role
 
-* Convert reviewed plan into a **strict execution IR**
-* No Python code generation
+A **state-aware tool caller** that edits the timeline.
 
-**Output**
+### Agent Cannot
 
-* `execution_ir.json`
-
-```json
-{
-  "operations": [
-    { "type": "trim", "clip": 1, "start": 0, "end": 5 },
-    { "type": "fade_in", "duration": 0.3 }
-  ]
-}
-```
+* Write FFmpeg
+* Generate assets
+* Modify files
+* Guess IDs
 
 ---
 
-### 5.4 Code Reviewer Agent
+### Agent Input
 
-**Responsibility**
+Injected on every run:
 
-* Validate IR completeness
-* Detect unsupported operations
-* Ensure ordering correctness
+* Timeline JSON
+* Asset list
+* Tool schemas
+* Constraints
+
+### Agent Output
+
+* **ONLY tool calls**
+* Zero free-form edits
 
 ---
 
-## 6. Execution Engine (Python Tool)
+## 6. Tooling Layer (Critical)
 
-### Role
+### Tool Design Rules
 
-* Deterministically execute `execution_ir.json`
-* No LLM involvement during execution
+* Atomic
+* Deterministic
+* Idempotent
+* Undoable
+* Typed arguments
+
+---
+
+### Required Tools (MVP)
+
+| Tool              | Purpose                 |
+| ----------------- | ----------------------- |
+| `add_clip`        | Place asset on timeline |
+| `remove_clip`     | Remove clip             |
+| `move_clip`       | Reposition clip         |
+| `trim_clip`       | Adjust clip length      |
+| `split_clip`      | Split clip              |
+| `add_transition`  | Fade / crossfade        |
+| `add_overlay`     | Text/image overlay      |
+| `set_audio_level` | Volume control          |
+| `export_project`  | Trigger render          |
+
+---
+
+## 7. Backend Architecture (FastAPI)
 
 ### Responsibilities
 
-* FFmpeg/MoviePy invocation
-* Error surfacing back to Vibe
-* Progress logging
-
-### Error Feedback Loop
-
-* Execution errors are sent back to **Code Reviewer Agent**
-* Max retries reduced from 15 → 3
+* Asset upload
+* Timeline mutation
+* Tool execution
+* Agent orchestration
+* Export rendering
 
 ---
 
-## 7. Mistral Vibe Integration
+## 8. Frontend Architecture (Next.js)
 
-### 7.1 Invocation Model
+### Responsibilities
 
-Python invokes Vibe via CLI:
-
-```bash
-vibe run agentic_video_edit.vibe \
-  --input artifacts/input_context.json \
-  --output artifacts/
-```
-
-### 7.2 Vibe Tools Exposed
-
-| Tool Name        | Description            |
-| ---------------- | ---------------------- |
-| `read_csv`       | Load and parse CSV     |
-| `probe_media`    | Extract video metadata |
-| `write_artifact` | Persist outputs        |
-| `run_executor`   | Execute IR             |
+* Timeline UI
+* Preview playback
+* Asset management
+* AI chat UI
+* Sync with backend state
 
 ---
 
-## 8. Configuration
+## 9. EXPORT PIPELINE (FFmpeg)
 
-### Environment Variables
+Triggered only via:
 
-```env
-MISTRAL_API_KEY=xxxx
-VIBE_MODEL_PLANNER=devstral
-VIBE_MODEL_REVIEWER=devstral
-VIBE_MODEL_CODE=devstral
-```
+* Export button
+* `export_project` tool
 
-### CLI Flags
+Steps:
 
-```bash
-python main.py \
-  --agent-runtime vibe \
-  --artifacts-dir artifacts \
-  --output artifacts/output.mp4
-```
+1. Parse timeline JSON
+2. Generate FFmpeg filter graph
+3. Render MP4
+4. Return file
+
+No AI involvement.
 
 ---
 
-## 9. Artifact Structure (Updated)
+# 10. REPO STRUCTURE (THIS IS THE BIG ONE)
+
+This structure is **Codex-friendly**, clean, and scalable.
+
+---
+
+## 📁 Root
 
 ```
-artifacts/
-├── input/
-│   └── video_editing_config.csv
-├── plans/
-│   ├── plan.json
-│   └── plan_reviewed.json
-├── ir/
-│   └── execution_ir.json
-├── logs/
-│   └── vibe_run.log
-├── output_video.mp4
+mistralclip/
+├─ apps/
+├─ backend/
+├─ frontend/
+├─ shared/
+├─ scripts/
+├─ README.md
+└─ docker-compose.yml
 ```
 
 ---
 
-## 10. Success Metrics
+## 📁 backend/
 
-### Technical
-
-* < 3 execution retries per run
-* Zero Python codegen from LLMs
-* Deterministic re-runs
-
-### Product
-
-* Ability to swap models without code changes
-* Clear separation of intent vs execution
-* Clean audit trail
+```
+backend/
+├─ main.py                  # FastAPI entry
+├─ config.py
+├─ requirements.txt
+│
+├─ api/
+│   ├─ routes/
+│   │   ├─ assets.py
+│   │   ├─ timeline.py
+│   │   ├─ chat.py
+│   │   └─ export.py
+│   └─ deps.py
+│
+├─ ai/
+│   ├─ agent.py              # LangChain agent
+│   ├─ prompt.py             # System prompt
+│   ├─ tools/
+│   │   ├─ add_clip.py
+│   │   ├─ trim_clip.py
+│   │   ├─ move_clip.py
+│   │   ├─ split_clip.py
+│   │   ├─ add_transition.py
+│   │   ├─ add_overlay.py
+│   │   ├─ set_audio_level.py
+│   │   └─ export_project.py
+│   └─ schemas.py            # Pydantic tool schemas
+│
+├─ timeline/
+│   ├─ model.py              # Timeline data model
+│   ├─ validator.py
+│   ├─ mutator.py            # Core mutation logic
+│   └─ undo.py
+│
+├─ media/
+│   ├─ ffmpeg/
+│   │   ├─ builder.py        # Filter graph builder
+│   │   └─ render.py
+│   └─ storage.py
+│
+├─ state/
+│   ├─ store.py              # In-memory + disk
+│   └─ persistence.py
+│
+└─ utils/
+    └─ ids.py
+```
 
 ---
 
-## 11. Risks & Mitigations
+## 📁 frontend/
 
-| Risk                 | Mitigation                  |
-| -------------------- | --------------------------- |
-| Vibe CLI instability | Fallback to legacy LLM path |
-| Model hallucination  | Strict IR schema            |
-| Slow runs            | Cached planning artifacts   |
-| Limited Vibe tooling | Thin Python adapter         |
+```
+frontend/
+├─ app/
+│   ├─ layout.tsx
+│   ├─ page.tsx
+│
+├─ components/
+│   ├─ AssetsPane.tsx
+│   ├─ PreviewCanvas.tsx
+│   ├─ Timeline/
+│   │   ├─ Timeline.tsx
+│   │   ├─ Clip.tsx
+│   │   └─ Track.tsx
+│   └─ Chat/
+│       ├─ ChatPanel.tsx
+│       └─ Message.tsx
+│
+├─ state/
+│   ├─ timelineStore.ts
+│   ├─ assetStore.ts
+│   └─ chatStore.ts
+│
+├─ lib/
+│   ├─ api.ts
+│   └─ sync.ts
+│
+└─ styles/
+```
 
 ---
 
-## 12. Future Extensions
+## 📁 shared/
 
-* Live event → auto highlight editing
-* SDK exposure for third-party platforms
-* Agent memory for style reuse
-* Streaming input support
-* Multi-video batch orchestration
+```
+shared/
+├─ timeline.schema.json
+├─ tool.contracts.json
+└─ constants.ts
+```
+
+Shared schemas ensure **frontend, backend, and AI never drift**.
 
 ---
+
+## 📁 scripts/
+
+```
+scripts/
+├─ dev.sh
+├─ export_test.sh
+└─ reset_state.sh
+```
+
+---
+
+## 11. LangChain Agent Prompt (Codex-Ready)
+
+**System Prompt (Core)**
+
+```
+You are an AI video editing agent.
+
+You do NOT generate media.
+You do NOT modify files.
+You ONLY call tools provided to you.
+
+Rules:
+- Use existing asset IDs and clip IDs only
+- Never invent IDs
+- One goal at a time
+- Stop after tools succeed
+
+You are editing a timeline JSON.
+```
+
+---
+
+## 12. API CONTRACTS (Minimal)
+
+### POST `/chat`
+
+* Input: user message
+* Output: tool execution result + updated timeline
+
+### POST `/timeline/mutate`
+
+* Input: tool call
+* Output: updated timeline
+
+### POST `/export`
+
+* Input: project_id
+* Output: MP4 URL
+
+---
+
+## 13. MVP SUCCESS TEST (VERY IMPORTANT)
+
+Your MVP is **done** if:
+
+✅ AI can trim, move, and fade clips
+✅ Manual edits and AI edits are identical
+✅ Exported video matches preview
+✅ No hallucinated timeline edits
+✅ Repo can be cloned and run locally
+
+---
+
+## Final Blunt Truth
+
+This repo + PRD is:
+
+* **Codex-friendly**
+* **One-shot scaffoldable**
+* **Hackathon-grade**
+* **Startup-extendable**
+
+You are building **infra for AI-driven editors**, not a toy.
+
 

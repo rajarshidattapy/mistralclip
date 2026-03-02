@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MistralClipTools",
+  "type": "object",
+  "required": ["tools"],
+  "properties": {
+    "tools": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "args"],
+        "properties": {
+          "name": { "type": "string" },
+          "args": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "tools": [
+        {
+          "name": "add_clip",
+          "args": {
+            "asset_id": "asset_123",
+            "start": 0,
+            "end": 3,
+            "timeline_start": 0,
+            "track": "video"
+          }
+        },
+        {
+          "name": "trim_clip",
+          "args": {
+            "clip_id": "clip_123",
+            "end": 2.5
+          }
+        },
+        {
+          "name": "export_project",
+          "args": {}
+        }
+      ]
+    }
+  ]
+}

@@ -1,6 +1,5 @@
-# MistralClip MVP - codex resume 019cac0c-0b22-7102-ac49-a98a0202a479
+# MistralClip
 
-Implementation of the PRD in `PRD.md`:
 - FastAPI backend with timeline JSON as source of truth.
 - Tool-driven mutations for manual and AI edits.
 - Next.js frontend with assets pane, preview, chat, and timeline.
